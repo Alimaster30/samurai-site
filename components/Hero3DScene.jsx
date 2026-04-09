@@ -55,9 +55,13 @@ function SakuraParticles({ count }) {
   return (
     <instancedMesh ref={meshRef} args={[null, null, count]}>
       <planeGeometry args={[1, 1]} />
-      <petalMaterial
+      <meshStandardMaterial
+        color="#e8a0b0"
+        emissive="#e8a0b0"
+        emissiveIntensity={0.15}
         side={THREE.DoubleSide}
         transparent
+        opacity={0.7}
         depthWrite={false}
       />
     </instancedMesh>
@@ -94,7 +98,6 @@ function SamuraiScene({ tier, scrollRef }) {
   const toriiGroupRef = useRef();
   const rimMatRef = useRef();
   const inkMatRef = useRef();
-  const fogMatRef = useRef();
 
   useEffect(() => {
     // Apply rim material to helmet meshes
@@ -117,21 +120,35 @@ function SamuraiScene({ tier, scrollRef }) {
     });
     inkMatRef.current = ink;
 
-    // Apply fog material to torii gate meshes for atmospheric depth
-    const fog = new FogMaterial();
-    fog.transparent = true;
-    fog.depthWrite = false;
+    // Tint torii gate dark red for atmospheric depth — keep original geometry shading
     torii.traverse((child) => {
-      if (child.isMesh) child.material = fog;
+      if (child.isMesh) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: "#1a0505",
+          emissive: "#E63946",
+          emissiveIntensity: 0.08,
+          roughness: 0.9,
+          metalness: 0.2,
+        });
+      }
     });
-    fogMatRef.current = fog;
+
+    // Tint katana
+    katana.traverse((child) => {
+      if (child.isMesh) {
+        child.material = new THREE.MeshStandardMaterial({
+          color: "#c0c0c0",
+          metalness: 0.9,
+          roughness: 0.15,
+        });
+      }
+    });
 
     return () => {
       rim.dispose();
       ink.dispose();
-      fog.dispose();
     };
-  }, [helmet, silhouette, torii]);
+  }, [helmet, silhouette, torii, katana]);
 
   useFrame((state) => {
     const { x, y } = state.mouse;
@@ -158,28 +175,31 @@ function SamuraiScene({ tier, scrollRef }) {
 
   return (
     <group ref={group}>
+      {/* Scene fog for natural depth falloff */}
+      <fog attach="fog" args={["#000000", 8, 22]} />
+
       {/* Lighting */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[-5, 8, 5]} intensity={1.5} color="#ffffff" castShadow={tier.shadows} />
-      <pointLight position={[-5, 2, -2]} intensity={4} color="#E63946" />
-      <pointLight position={[5, -2, 5]} intensity={0.8} color="#330000" />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[-5, 8, 5]} intensity={1.8} color="#ffffff" castShadow={tier.shadows} />
+      <pointLight position={[-5, 2, -2]} intensity={5} color="#E63946" />
+      <pointLight position={[4, 1, 3]} intensity={1.2} color="#330000" />
 
       <Environment preset="night" />
 
-      {/* Silhouette bg — centered behind everything */}
-      <primitive object={silhouette} position={[0, -0.5, -14]} scale={7} />
+      {/* Silhouette bg — centered behind everything, subtle dark red presence */}
+      <primitive object={silhouette} position={[1, -0.5, -10]} scale={5} />
 
-      {/* Torii — scroll-driven Z via wrapper group, raised and centered-right */}
+      {/* Torii — scroll-driven Z, background depth element */}
       <group ref={toriiGroupRef}>
-        <primitive object={torii} position={[2, -1.5, -8]} scale={4} rotation={[0, Math.PI / 8, 0]} />
+        <primitive object={torii} position={[1.5, -1, -6]} scale={3.5} rotation={[0, Math.PI / 10, 0]} />
       </group>
 
-      {/* Katana midground — angled between helmet and torii */}
-      <primitive object={katana} position={[1, -0.5, -2]} scale={1.8} rotation={[0.3, -0.6, Math.PI / 5]} />
+      {/* Katana — angled diagonally, right-of-center midground */}
+      <primitive object={katana} position={[1.5, 0.2, -1.5]} scale={2.2} rotation={[0.1, -0.3, Math.PI / 4]} />
 
-      {/* Helmet foreground — right side, ~50% coverage per PRD */}
-      <Float speed={1.5} rotationIntensity={0.3} floatIntensity={0.6}>
-        <primitive object={helmet} scale={2.5} position={[2.5, -0.3, 0]} />
+      {/* Helmet foreground — right side, dominant element */}
+      <Float speed={1.5} rotationIntensity={0.25} floatIntensity={0.5}>
+        <primitive object={helmet} scale={2.8} position={[3, -0.2, 1]} />
       </Float>
 
       {/* Sakura particles */}
